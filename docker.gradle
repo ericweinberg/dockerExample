@@ -37,6 +37,15 @@ def MYSQL_USER = "example"
 def MYSQL_USER_PASSWORD = "examplePassword"
 def MYSQL_DB = "example"
 
+
+task startAll {
+    dependsOn 'startMysqlContainer', 'startApplicationContainer'
+}
+
+task stopAll {
+    dependsOn 'stopApplicationContainer', 'stopMysqlContainer'
+}
+
 task moveDependencies(type: Copy) {
     from "build/libs/dockerComposeExample.jar"
     into "infrastructure/application"
@@ -106,3 +115,7 @@ task startMysqlContainer(type: DockerStartContainer) {
     dependsOn buildMysqlContainer
     targetContainerId { MYSQL_CONTAINER_NAME}
 }
+
+
+startApplicationContainer.mustRunAfter startMysqlContainer
+stopMysqlContainer.mustRunAfter stopApplicationContainer
