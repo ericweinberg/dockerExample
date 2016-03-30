@@ -27,8 +27,8 @@ http://localhost:8080/helloWorld
 ```
 ##Technologies Used
 
-Gradle
-Docker
+Gradle  
+Docker  
 Spring boot
 
 ##Outstanding Questions
