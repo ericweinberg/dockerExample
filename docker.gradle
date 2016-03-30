@@ -22,10 +22,13 @@ docker {
 }
 
 import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 import com.bmuschko.gradle.docker.tasks.container.DockerStartContainer
 import com.bmuschko.gradle.docker.tasks.container.DockerCreateContainer
 import com.bmuschko.gradle.docker.tasks.container.DockerStopContainer
 import com.bmuschko.gradle.docker.tasks.container.DockerRemoveContainer
+
+def APPLICATION_CONTAINER_NAME = "example_java"
 
 def MYSQL_CONTAINER_NAME = "example_mysql"
 //variables that should be injected from somewhere
@@ -33,6 +36,47 @@ def MYSQL_ROOT_PASSWORD = "password"
 def MYSQL_USER = "example"
 def MYSQL_USER_PASSWORD = "examplePassword"
 def MYSQL_DB = "example"
+
+task moveDependencies(type: Copy) {
+    from "build/libs/dockerComposeExample.jar"
+    into "infrastructure/application"
+    rename "dockerComposeExample.jar", 'application.jar'
+}
+
+task cleanDependencies << {
+    project.file('infrastructure/application/application.jar').delete();
+}
+
+task buildApplicationImage(type: DockerBuildImage) {
+    dependsOn 'moveDependencies', 'assemble'
+    inputDir = project.file("infrastructure/application")
+    tag = "$APPLICATION_CONTAINER_NAME"
+    finalizedBy 'cleanDependencies'
+}
+
+task buildApplicationContainer(type: DockerCreateContainer) {
+    dependsOn buildApplicationImage
+    hostName = APPLICATION_CONTAINER_NAME
+    containerName = APPLICATION_CONTAINER_NAME
+    targetImageId {buildApplicationImage.getImageId()}
+    portBindings = ['8080::8080']
+
+}
+
+task removeApplicationContainer(type: DockerRemoveContainer) {
+    removeVolumes = true
+    targetContainerId { APPLICATION_CONTAINER_NAME }
+}
+
+task stopApplicationContainer(type: DockerStopContainer) {
+    targetContainerId { APPLICATION_CONTAINER_NAME}
+    finalizedBy 'removeApplicationContainer'
+}
+
+task startApplicationContainer(type: DockerStartContainer) {
+    dependsOn buildApplicationContainer
+    targetContainerId { APPLICATION_CONTAINER_NAME}
+}
 
 task pullMysqlImage(type: DockerPullImage) {
     repository = 'mysql'
