@@ -1,0 +1,64 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.bmuschko:gradle-docker-plugin:2.6.5'
+    }
+}
+
+apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
+
+docker {
+    if(System.env.DOCKER_HOST) {
+        url = "$System.env.DOCKER_HOST".replace('tcp', 'https')
+        certPath = new File("$System.env.DOCKER_CERT_PATH")
+    }
+    else {
+        //if no docker host is set, then we're going to assume we're on a big boy linux environment with docker running natively
+        url = 'unix:///var/run/docker.sock'
+    }
+}
+
+import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
+import com.bmuschko.gradle.docker.tasks.container.DockerStartContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerCreateContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerStopContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerRemoveContainer
+
+def MYSQL_CONTAINER_NAME = "example_mysql"
+//variables that should be injected from somewhere
+def MYSQL_ROOT_PASSWORD = "password"
+def MYSQL_USER = "example"
+def MYSQL_USER_PASSWORD = "examplePassword"
+def MYSQL_DB = "example"
+
+task pullMysqlImage(type: DockerPullImage) {
+    repository = 'mysql'
+    tag = '5.6'
+}
+
+task buildMysqlContainer(type: DockerCreateContainer) {
+    dependsOn pullMysqlImage
+    hostName = MYSQL_CONTAINER_NAME
+    containerName = MYSQL_CONTAINER_NAME
+    imageId = "$pullMysqlImage.repository:$pullMysqlImage.tag"
+    env = ["MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD", "MYSQL_DATABASE=$MYSQL_DB", "MYSQL_USER=$MYSQL_USER", "MYSQL_PASSWORD=$MYSQL_USER_PASSWORD"]
+    portBindings = ['3306::3306']
+}
+
+task removeMysqlContainer(type: DockerRemoveContainer) {
+    removeVolumes = true
+    targetContainerId { MYSQL_CONTAINER_NAME }
+}
+
+task stopMysqlContainer(type: DockerStopContainer) {
+    targetContainerId { MYSQL_CONTAINER_NAME}
+    finalizedBy 'removeMysqlContainer'
+}
+
+task startMysqlContainer(type: DockerStartContainer) {
+    dependsOn buildMysqlContainer
+    targetContainerId { MYSQL_CONTAINER_NAME}
+}
